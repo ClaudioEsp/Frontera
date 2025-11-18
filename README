@@ -1,0 +1,22 @@
+################################## Documentación ##################################
+
+Este es el orquestador que (hasta la versión actual) se comunica con la API de dispatchtracker para solicitar 
+los datos de forma periódica: Actualmente consiste en un orquestador construido en python, el cual tiene
+acceso a los datos de Paris a través de las variables de ambiente (API url y TOKEN).
+
+Este orquestador está conectado a una base de datos local construida sobre MongoDB para la gestión de la
+información.
+
+
+
+
+Stack de tecnologias necesarias para correr el orquestador (última versión a fecha de este documento):
+
+- Python
+- MongoDB
+
+Herramientas extras utilizadas durante el desarrollo (por completitud):
+
+- VSCode
+- Postman
+- MongoDB compass
