@@ -32,13 +32,18 @@ class DispatchTrackClient:
         url = f"{self.base_url}/trucks"
         resp = self.session.get(url, params=params, timeout=30)
 
-        # Better error message
-        if resp.status_code == 401:
-            raise RuntimeError(
-                f"Unauthorized (401) when calling {url}. "
-                f"Check DISPATCHTRACK_TOKEN and that it matches the X-AUTH-TOKEN used in Postman. "
-                f"Response body: {resp.text!r}"
-            )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_routes(self, date: str, **params):
+        """
+        Calls /routes with a required date parameter (YYYY-MM-DD).
+        Example: GET /routes?date=2025-01-22
+        """
+        url = f"{self.base_url}/routes"
+        params = {**params, "date": date}
+
+        resp = self.session.get(url, params=params, timeout=30)
 
         resp.raise_for_status()
         return resp.json()

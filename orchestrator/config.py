@@ -1,9 +1,9 @@
 JOBS = [
     {
-        "id": "get_trucks",
-        "module": "jobs.get_trucks",
+        "id": "get_routes",
+        "module": "jobs.get_routes",  # adjust path if needed
         "type": "interval",
-        "seconds": 5
+        "seconds": 300,
     },
 
 ]
