@@ -6,8 +6,13 @@ from pathlib import Path
 from pymongo import MongoClient
 from dispatchtrack_client import DispatchTrackClient
 
-# ---------- File / reports path (PROYECTO_REPORTES/data/raw) ----------
-BASE_DIR = Path(__file__).resolve().parents[2]     # PROYECTO_REPORTES
+# ---------- File / reports path (../data/raw, data is OUTSIDE the project) ----------
+# PROJECT_DIR = .../PROYECTO_REPORTES
+PROJECT_DIR = Path(__file__).resolve().parents[2]
+
+# BASE_DIR = parent folder that contains both PROYECTO_REPORTES and data
+BASE_DIR = PROJECT_DIR.parent
+
 DATA_DIR = BASE_DIR / "data" / "raw"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -51,7 +56,7 @@ def run(date=None, minified=True):
     date_str = _normalize_date(date)
 
     client = DispatchTrackClient()
-    print(f"[get_routes] Fetching routes from DispatchTrack for date {date_str} (minifield={minified})...")
+    print(f"[get_routes] Fetching routes from DispatchTrack for date {date_str} (minified={minified})...")
 
     routes_json = client.get_routes(date=date_str, minified=minified)
 
