@@ -2,7 +2,7 @@
 
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pymongo import MongoClient
 
@@ -18,13 +18,16 @@ ROUTES_COLLECTION = "routes"
 
 def run(date_str: str) -> None:
     """
-    For all routes of a given date that don't yet have full details,
-    call /routes/{route_number} and store the full payload.
+    For all *unclosed* routes of a given date, call /routes/{route_number}
+    and store the full payload.
+
+    While a route is not closed, its full data might change in the API,
+    so we ALWAYS refresh full_raw for routes where is_closed != True.
 
     It sets:
       - full_raw: full route payload from API
       - has_full_details: True
-      - last_refreshed_at: now
+      - last_refreshed_at: now (UTC, timezone-aware)
     """
     logger.info("Starting get_details_from_route for date=%s", date_str)
 
@@ -32,13 +35,16 @@ def run(date_str: str) -> None:
     db = client[DB_NAME]
     routes_col = db[ROUTES_COLLECTION]
 
+    # Only routes for this date that are NOT marked as closed.
+    # Routes without is_closed field are treated as open.
     query = {
         "date": date_str,
-        "has_full_details": False,
+        "is_closed": {"$ne": True},
     }
 
     cursor = routes_col.find(query)
     total = 0
+    now_utc = datetime.now(timezone.utc)
 
     for route_doc in cursor:
         route_key = route_doc.get("route_key")
@@ -70,14 +76,18 @@ def run(date_str: str) -> None:
                 "$set": {
                     "full_raw": full_payload,
                     "has_full_details": True,
-                    "last_refreshed_at": datetime.utcnow(),
+                    "last_refreshed_at": now_utc,
                 }
             },
         )
         total += 1
 
     client.close()
-    logger.info("Finished get_details_from_route for %s, updated %d routes.", date_str, total)
+    logger.info(
+        "Finished get_details_from_route for %s, updated %d routes.",
+        date_str,
+        total,
+    )
 
 
 if __name__ == "__main__":

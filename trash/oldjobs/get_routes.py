@@ -8,7 +8,7 @@ from pathlib import Path
 import hashlib
 
 from pymongo import MongoClient
-from dispatchtrack_client import DispatchTrackClient
+from orchestrator.jobs.dispatchtrack_client import DispatchTrackClient
 
 # ---------- File / reports path ----------
 PROJECT_DIR = Path(__file__).resolve().parents[2]

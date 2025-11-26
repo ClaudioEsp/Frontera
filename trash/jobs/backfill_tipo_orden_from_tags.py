@@ -30,29 +30,33 @@ def _get_tag_value_from_dispatch(doc: Dict[str, Any], tag_name: str) -> Optional
     return None
 
 
-def run():
+def run(route_key: str) -> None:
     """
     Rellena el campo plano 'tipo_orden' en la colección 'dispatches'
-    leyendo el tag 'TIPO_ORDEN' desde dispatch_raw.tags.
+    leyendo el tag 'TIPO_ORDEN' desde dispatch_raw.tags,
+    SOLO para los despachos de una ruta dada (route_key).
 
     Solo toca documentos donde:
+      - 'route_key' == route_key
       - 'tipo_orden' no existe, es null o cadena vacía.
     """
     client = MongoClient(MONGO_URI)
     col = client[DISPATCHTRACK_DB][DISPATCHES_COLLECTION]
 
     logger.info(
-        "Starting backfill_tipo_orden_from_tags on %s.%s",
+        "Starting backfill_tipo_orden_from_tags on %s.%s for route_key=%s",
         DISPATCHTRACK_DB,
         DISPATCHES_COLLECTION,
+        route_key,
     )
 
     query = {
+        "route_key": route_key,
         "$or": [
             {"tipo_orden": {"$exists": False}},
             {"tipo_orden": None},
             {"tipo_orden": ""},
-        ]
+        ],
     }
 
     cursor = col.find(
@@ -78,8 +82,12 @@ def run():
         )
         updated += 1
 
+    client.close()
+
     logger.info(
-        "Finished backfill_tipo_orden_from_tags. scanned=%d updated=%d missing_tag=%d",
+        "Finished backfill_tipo_orden_from_tags for route_key=%s. "
+        "scanned=%d updated=%d missing_tag=%d",
+        route_key,
         total,
         updated,
         missing,
@@ -87,4 +95,16 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Backfill tipo_orden from tags for dispatches of a route."
+    )
+    parser.add_argument(
+        "--route-key",
+        required=True,
+        help="Route identifier (route_key) whose dispatches should be updated.",
+    )
+    args = parser.parse_args()
+
+    run(args.route_key)

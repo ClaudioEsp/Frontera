@@ -51,9 +51,9 @@ def _extract_codcomu_value(disp_doc: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def run() -> None:
+def run(route_key: str) -> None:
     """
-    Match CT like this:
+    Match CT for all dispatches of a given route (route_key):
 
        dispatch_raw.tags[*].name == "CODCOMU"
            → extract tag.value = external_id
@@ -61,9 +61,14 @@ def run() -> None:
        external_id matches CT_DB["Id Externo"]
 
        dispatch.ct = CT_DB["CT CORRESPONDE"]
+
+    Only processes dispatches where:
+      - route_key == route_key
+      - ct is None or does not exist.
     """
     logger.info(
-        "Starting get_ct: dispatch_db=%s, ct_db=%s.%s",
+        "Starting get_ct for route_key=%s: dispatch_db=%s, ct_db=%s.%s",
+        route_key,
         DISPATCHTRACK_DB,
         CT_DATABASE,
         CT_COLLECTION,
@@ -74,8 +79,16 @@ def run() -> None:
     disp_col = client[DISPATCHTRACK_DB][DISPATCHES_COLLECTION]
     ct_col = client[CT_DATABASE][CT_COLLECTION]
 
-    # Dispatches still missing CT
-    cursor = disp_col.find({"$or": [{"ct": None}, {"ct": {"$exists": False}}]})
+    # Dispatches of this route still missing CT
+    cursor = disp_col.find(
+        {
+            "route_key": route_key,
+            "$or": [
+                {"ct": None},
+                {"ct": {"$exists": False}},
+            ],
+        }
+    )
 
     total = 0
     updated = 0
@@ -118,7 +131,9 @@ def run() -> None:
     client.close()
 
     logger.info(
-        "get_ct complete. Processed=%d, updated=%d, no_CODCOMU=%d, not_found_in_CT=%d",
+        "get_ct complete for route_key=%s. "
+        "Processed=%d, updated=%d, no_CODCOMU=%d, not_found_in_CT=%d",
+        route_key,
         total,
         updated,
         no_codcomu,
@@ -127,4 +142,16 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Match CT for dispatches of a single route."
+    )
+    parser.add_argument(
+        "--route-key",
+        required=True,
+        help="Route identifier (route_key) whose dispatches should be updated.",
+    )
+    args = parser.parse_args()
+
+    run(args.route_key)
