@@ -1,22 +1,27 @@
 import os
 import logging
 from typing import List, Optional
-from datetime import datetime, timedelta, timezone  # <-- NUEVO
-
+from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
+from dotenv import load_dotenv
+
+# Load environment variables from the .env file located one folder above the current directory
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 logger = logging.getLogger("job.backfill_compromise_date_from_tags")
 logger.setLevel(logging.INFO)
 logging.basicConfig(level=logging.INFO)
 
 # Mongo env
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "FRONTERA")
 MONGO_COLLECTION = os.getenv("DISPATCHES_COLLECTION", "DISPATCHES")
 
 # Ventana de horas para considerar "recientes"
 SYNC_WINDOW_HOURS = int(os.getenv("SYNC_WINDOW_HOURS", "6"))  # p.ej. últimas 6 horas
 
+# Batch size for processing
+BATCH_SIZE = 100
 
 def extract_fecsoldes(tags: List[dict]) -> Optional[str]:
     """
@@ -48,54 +53,13 @@ def normalize_compromise_date(raw: str) -> Optional[str]:
     return f"{s[0:4]}-{s[4:6]}-{s[6:8]}"
 
 
-def run() -> int:
+def process_batch(docs, col):
     """
-    Backfill compromise_date ONLY for recent dispatches:
-
-      - Docs without compromise_date
-      - AND sync_timestamp dentro de las últimas SYNC_WINDOW_HOURS horas
-
-      Lee tag 'FECSOLDES' de tags:
-        compromise_date_raw = FECSOLDES
-        compromise_date     = YYYY-MM-DD
+    Process a batch of documents to update their compromise_date.
+    The 'col' parameter is the MongoDB collection used to perform updates.
     """
-    logger.info(
-        "Starting job: backfill_compromise_date_from_tags "
-        "on %s.%s (window: last %d hours)",
-        MONGO_DB_NAME,
-        MONGO_COLLECTION,
-        SYNC_WINDOW_HOURS,
-    )
-
-    mongo = MongoClient(MONGO_URI)
-    col = mongo[MONGO_DB_NAME][MONGO_COLLECTION]
-
-    # Umbral de tiempo para considerar "reciente"
-    now_utc = datetime.now(timezone.utc)
-    threshold_dt = now_utc - timedelta(hours=SYNC_WINDOW_HOURS)
-    threshold_iso = threshold_dt.isoformat()
-
-    # Solo docs:
-    #  - sin compromise_date
-    #  - con sync_timestamp reciente (>= threshold_iso)
-    docs = col.find(
-        {
-            "compromise_date": {"$exists": False},
-            "sync_timestamp": {"$gte": threshold_iso},
-        },
-        {
-            "_id": 1,
-            "tags": 1,
-            "sync_timestamp": 1,
-        },
-    )
-
-    count = 0
     updated = 0
-
     for doc in docs:
-        count += 1
-
         _id = doc.get("_id")
         tags = doc.get("tags", [])
 
@@ -114,6 +78,7 @@ def run() -> int:
             )
             continue
 
+        # Update document in MongoDB
         col.update_one(
             {"_id": _id},
             {
@@ -132,6 +97,50 @@ def run() -> int:
             doc.get("sync_timestamp"),
         )
         updated += 1
+
+    return updated
+
+
+def run() -> int:
+    """
+    Backfill compromise_date ONLY for recent dispatches in batches.
+    """
+    logger.info(
+        "Starting job: backfill_compromise_date_from_tags "
+        "on %s.%s (window: last %d hours)",
+        MONGO_DB_NAME,
+        MONGO_COLLECTION,
+        SYNC_WINDOW_HOURS,
+    )
+
+    mongo = MongoClient(MONGO_URI)
+    col = mongo[MONGO_DB_NAME][MONGO_COLLECTION]
+
+    # Umbral de tiempo para considerar "reciente"
+    now_utc = datetime.now(timezone.utc)
+    threshold_dt = now_utc - timedelta(hours=SYNC_WINDOW_HOURS)
+    threshold_iso = threshold_dt.isoformat()
+
+    # Query for documents without 'compromise_date' and within the sync window
+    query = {
+        "compromise_date": {"$exists": False},
+        "sync_timestamp": {"$gte": threshold_iso},
+    }
+
+    # Initializing count and updated counters
+    count = 0
+    updated = 0
+
+    # Batch processing loop
+    while True:
+        # Get a batch of documents
+        docs = list(col.find(query, {"_id": 1, "tags": 1, "sync_timestamp": 1}).batch_size(BATCH_SIZE))
+
+        if not docs:
+            break  # Exit loop if no more documents to process
+
+        count += len(docs)
+        updated += process_batch(docs, col)
 
     mongo.close()
 

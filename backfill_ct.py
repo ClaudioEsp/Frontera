@@ -14,7 +14,7 @@ logger = logging.getLogger("job.get_ct")
 logging.basicConfig(level=logging.INFO)
 
 # MongoDB connection and configuration
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI")
 DATABASE = os.getenv("MONGO_DB_NAME", "FRONTERA")
 DISPATCHES_COLLECTION = os.getenv("DISPATCHES_COLLECTION", "DISPATCHES")
 CT_COLLECTION = os.getenv("CT_COLLECTION", "CTS")

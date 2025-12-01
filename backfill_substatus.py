@@ -2,24 +2,24 @@ import os
 import logging
 import math
 from typing import Any, Dict, Optional, Set
-from datetime import datetime, timedelta, timezone  # <-- NUEVO
-
+from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
-# Load env (.env at project root)
-load_dotenv()
+# Load environment variables from one directory above the current directory
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
+# Logger configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("job.get_substatus")
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI")
 DATABASE = os.getenv("DATABASE", "FRONTERA")
 DISPATCHES_COLLECTION = os.getenv("DISPATCHES_COLLECTION", "DISPATCHES")
 SUB_STATUS_COLLECTION = os.getenv("SUB_STATUS_COLLECTION", "SUB_STATUS")
 
 # Ventana de horas para considerar "recientes"
-SYNC_WINDOW_HOURS = int(os.getenv("SYNC_WINDOW_HOURS", "6"))  # p.ej. últimas 6 horas
+SYNC_WINDOW_HOURS = int(os.getenv("SYNC_WINDOW_HOURS", "6"))  # e.g. last 6 hours
 
 
 def _is_bad_number(value: Any) -> bool:
@@ -149,9 +149,10 @@ def run() -> None:
     threshold_dt = now_utc - timedelta(hours=SYNC_WINDOW_HOURS)
     threshold_iso = threshold_dt.isoformat()
 
-    BATCH_SIZE = 1000  # ajusta si quieres
+    BATCH_SIZE = 1000  # adjust if needed
     last_id = None
 
+    # Flags for tracking
     total = 0
     null_or_invalid_code = 0
     mapped = 0
@@ -159,11 +160,11 @@ def run() -> None:
 
     try:
         while True:
-            # Base query: solo recientes
+            # Base query: only recent ones
             query: Dict[str, Any] = {
                 "sync_timestamp": {"$gte": threshold_iso},
             }
-            # Y vamos avanzando por _id para evitar cursores largos
+            # Move forward by _id to avoid long cursors
             if last_id is not None:
                 query["_id"] = {"$gt": last_id}
 
@@ -175,7 +176,7 @@ def run() -> None:
 
             docs = list(cursor)
             if not docs:
-                break  # no quedan más documentos recientes
+                break  # no more recent documents
 
             for disp in docs:
                 last_id = disp["_id"]
@@ -184,7 +185,7 @@ def run() -> None:
                 code = disp.get("substatus_code", None)
                 norm = _normalize_code(code)
 
-                # Case 1: no usable code -> force estados to null
+                # Case 1: no usable code -> force states to null
                 if norm is None:
                     update_fields = {
                         "estado_beetrack": None,

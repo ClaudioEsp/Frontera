@@ -4,13 +4,17 @@ from typing import List, Optional
 from datetime import datetime, timedelta, timezone  # <-- NUEVO
 
 from pymongo import MongoClient
+from dotenv import load_dotenv
+
+# Load environment variables from the .env file located one folder above the current directory
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 
 logger = logging.getLogger("job.backfill_tipo_orden_from_tags")
 logger.setLevel(logging.INFO)
 logging.basicConfig(level=logging.INFO)
 
 # Mongo env
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+MONGO_URI = os.getenv("MONGO_URI")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "FRONTERA")
 MONGO_COLLECTION = os.getenv("DISPATCHES_COLLECTION", "DISPATCHES")
 

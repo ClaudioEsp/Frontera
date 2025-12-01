@@ -3,7 +3,7 @@ import logging
 import requests
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from datetime import datetime, timezone  # <-- NUEVO
+from datetime import datetime, timezone
 
 # Load environment variables from one directory above the current directory
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -118,19 +118,24 @@ def save_dispatch_to_mongo(dispatch: dict, sync_time: datetime):
         "sync_timestamp": sync_time.isoformat()
     }
 
-    # Actualizamos SIEMPRE (para que sync_timestamp se vaya refrescando)
-    dispatches_col.update_one(
-        {"identifier": dispatch_id},
-        {"$set": dispatch_doc},
-        upsert=True
-    )
-
-    logger.info(f"Dispatch {dispatch_id} saved/updated in MongoDB.")
+    # Check if the dispatch exists before updating or inserting
+    existing_dispatch = dispatches_col.find_one({"identifier": dispatch_id})
+    if existing_dispatch:
+        # Update the document if it already exists
+        dispatches_col.update_one(
+            {"identifier": dispatch_id},
+            {"$set": dispatch_doc}
+        )
+        logger.info(f"Dispatch {dispatch_id} updated in MongoDB.")
+    else:
+        # Insert the new dispatch if it doesn't exist
+        dispatches_col.insert_one(dispatch_doc)
+        logger.info(f"Dispatch {dispatch_id} saved in MongoDB.")
 
 
 # Example usage: fetching dispatches for a specific date range
 if __name__ == "__main__":
-    start_date = "2025-12-01"
-    end_date = "2025-12-01"
+    start_date = "2025-12-02"
+    end_date = "2025-12-02"
     
     fetch_dispatches_by_dates(start_date, end_date)
