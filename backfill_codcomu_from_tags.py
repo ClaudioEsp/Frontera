@@ -19,7 +19,7 @@ MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "FRONTERA")
 MONGO_COLLECTION = os.getenv("DISPATCHES_COLLECTION", "DISPATCHES")
 
 # Ventana de horas para considerar "recientes"
-SYNC_WINDOW_HOURS = int(os.getenv("SYNC_WINDOW_HOURS", "480"))  # por defecto, últimas 6 horas
+SYNC_WINDOW_HOURS = int(os.getenv("SYNC_WINDOW_HOURS", "9999999"))  # por defecto, últimas 6 horas
 
 
 def extract_tipo_orden(tags: List[dict]) -> Optional[str]:
@@ -31,7 +31,7 @@ def extract_tipo_orden(tags: List[dict]) -> Optional[str]:
         return None
 
     for tag in tags:
-        if isinstance(tag, dict) and tag.get("name") == "TIPO_ORDEN":
+        if isinstance(tag, dict) and tag.get("name") == "CODCOMU":
             return tag.get("value")
 
     return None
@@ -66,7 +66,7 @@ def run() -> int:
     # Only docs lacking tipo_orden AND with recent sync_timestamp
     docs = col.find(
         {
-            "tipo_orden": {"$exists": False},
+            "cod_comu": {"$exists": False},
         },
         {
             "_id": 1,
@@ -87,20 +87,20 @@ def run() -> int:
         tipo_orden_value = extract_tipo_orden(tags)
 
         if tipo_orden_value is None:
-            logger.info("%s: TIPO_ORDEN not found → skipped", _id)
+            logger.info("%s: CODCOMU not found → skipped", _id)
             continue
 
         col.update_one(
             {"_id": _id},
             {
                 "$set": {
-                    "tipo_orden": tipo_orden_value,
+                    "cod_comu": tipo_orden_value,
                 }
             },
         )
 
         logger.info(
-            "Updated %s: TIPO_ORDEN=%s (sync_timestamp=%s)",
+            "Updated %s: CODCOMU=%s (sync_timestamp=%s)",
             _id,
             tipo_orden_value,
             doc.get("sync_timestamp"),
@@ -110,7 +110,7 @@ def run() -> int:
     mongo.close()
 
     logger.info(
-        "Finished backfill_tipo_orden_from_tags (recent only). "
+        "Finished backfill_codcomu_from_tags (recent only). "
         "Scanned: %d docs — Updated: %d docs.",
         count,
         updated,

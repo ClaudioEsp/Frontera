@@ -12,18 +12,22 @@ if ENV_PATH.exists():
     load_dotenv(ENV_PATH)
 
 # --- CONFIG ---
-EXCEL_PATH = r"C:\Users\test\Downloads\ID_ESTADOS.xlsx" 
+EXCEL_PATH = r"Localidad Paris 2025-11-21.xlsx" 
 SHEET_NAME = 0  # 0 = first sheet, or use the sheet name as a string
 
 # Mongo config (change to your values or use env vars)
 MONGO_URI = os.getenv("MONGO_URI")
-MONGO_DB_NAME = "SUB_STATUS_DATABASE"
-MONGO_COLLECTION_NAME = "SUB_STATUS_COLLECTION"
+MONGO_DB_NAME = "FRONTERA"
+MONGO_COLLECTION_NAME = "CTS"
 # ---------------
 
 def main():
-    # 1) Read Excel
-    df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
+
+    try:
+        # 1) Read Excel
+        df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_NAME)
+    except:
+        print('Error loading file')
 
     # Optional: replace NaN with None so Mongo stores null
     df = df.where(pd.notnull(df), None)
@@ -39,6 +43,11 @@ def main():
     client = MongoClient(MONGO_URI)
     db = client[MONGO_DB_NAME]
     collection = db[MONGO_COLLECTION_NAME]
+
+    print(MONGO_URI)
+    print(MONGO_DB_NAME)
+    print(MONGO_COLLECTION_NAME)
+
 
     # 4) Insert into Mongo
     result = collection.insert_many(records)
